@@ -1,6 +1,6 @@
 'use strict';
 
-const octokit = require('@octokit/rest')();
+const Octokit = require('@octokit/rest');
 
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
 
@@ -10,9 +10,8 @@ if (!GITHUB_TOKEN) {
   process.exit(1);
 }
 
-octokit.authenticate({
-  type: 'token',
-  token: GITHUB_TOKEN
+const octokit = new Octokit({
+  auth: GITHUB_TOKEN,
 });
 
 // Time of https://github.com/web-platform-tests/wpt/issues/13818#issuecomment-436330922
@@ -20,39 +19,20 @@ const SINCE = '2018-11-06T17:07:56Z';
 
 async function paginate(method, parameters) {
   parameters = Object.assign({ per_page: 100 }, parameters);
-  let response = await method(parameters);
-  const { data } = response;
-
-  while (octokit.hasNextPage(response)) {
-    response = await octokit.getNextPage(response);
-    data.push(...response.data);
-  }
-  return data;
-}
-
-async function paginateSearch(method, parameters) {
-  parameters = Object.assign({ per_page: 100 }, parameters);
-  let response = await method(parameters);
-  const items = response.data.items;
-
-  while (octokit.hasNextPage(response)) {
-    response = await octokit.getNextPage(response);
-    items.push(...response.data.items);
-  }
-  return items;
+  const options = method.endpoint.merge(parameters);
+  return octokit.paginate(options);
 }
 
 async function main() {
-  const prs = await paginateSearch(octokit.search.issues, {
+  const prs = await paginate(octokit.search.issuesAndPullRequests, {
     q: `repo:web-platform-tests/wpt is:pr is:open updated:>${SINCE}`,
   });
 
   for (const pr of prs) {
-    console.log(octokit.pullRequests.getCommits);
-    const commits = await paginate(octokit.pullRequests.getCommits, {
+    const commits = await paginate(octokit.pulls.listCommits, {
       owner: 'web-platform-tests',
       repo: 'wpt',
-      number: pr.number,
+      pull_number: pr.number,
     });
 
     // only look at the final commit
@@ -64,7 +44,7 @@ async function main() {
       ref,
     });
 
-    const azureRun = checks.check_runs.find(run => run.name == 'Azure Pipelines');
+    const azureRun = checks.find(run => run.name == 'Azure Pipelines');
     if (!azureRun) {
         // If created before the cutoff time and there are no checks, that's
         // probably because the update was just a commment and no CI has run.

@@ -1,7 +1,9 @@
 'use strict';
 
-const octokit = require('@octokit/rest')({
-  auth: `token ${process.env.GITHUB_TOKEN}`,
+const Octokit = require('@octokit/rest');
+
+const octokit = new Octokit({
+  auth: process.env.GITHUB_TOKEN,
 });
 
 // https://github.com/octokit/rest.js/#pagination

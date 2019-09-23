@@ -1,7 +1,7 @@
 const Octokit = require('@octokit/rest');
 
 const octokit = new Octokit({
-    auth: `token ${process.env.GITHUB_TOKEN}`
+    auth: process.env.GITHUB_TOKEN,
 });
 
 const repoOptions = { owner: 'web-platform-tests', repo: 'wpt' };
