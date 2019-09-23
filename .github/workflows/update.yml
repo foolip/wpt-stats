@@ -1,0 +1,30 @@
+on:
+  schedule:
+    # 6:40 UTC daily
+    - cron: '40 6 * * *'
+  push:
+    branches:
+    - master
+name: update
+jobs:
+  update:
+    runs-on: ubuntu-18.04
+    steps:
+    - name: Checkout
+      uses: actions/checkout@master
+    - name: Checkout wpt
+      uses: actions/checkout@master
+      with:
+        repository: web-platform-tests/wpt
+        ref: master
+        path: wpt
+    - name: Setup node
+      uses: actions/setup-node@master
+      with:
+        node-version: 10.x
+    - name: Install dependencies
+      run: npm ci
+    - name: Collect Azure Pipelines stats
+      run: node azure.js
+    - name: Collect Taskcluster stats
+      run: node taskcluster.js
