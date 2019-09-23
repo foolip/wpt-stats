@@ -42,7 +42,7 @@ async function paginateSearch(method, parameters) {
   return items;
 }
 
-(async () => {
+async function main() {
   const prs = await paginateSearch(octokit.search.issues, {
     q: `repo:web-platform-tests/wpt is:pr is:open updated:>${SINCE}`,
   });
@@ -84,4 +84,9 @@ async function paginateSearch(method, parameters) {
       console.log(`#${pr.number}: ${azureRun.conclusion}`);
     }
   }
-})();
+}
+
+main().catch((reason) => {
+  console.error(reason);
+  process.exit(1);
+});

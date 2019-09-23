@@ -153,4 +153,7 @@ async function main() {
   await checkPRs(since);
 }
 
-main();
+main().catch((reason) => {
+  console.error(reason);
+  process.exit(1);
+});
