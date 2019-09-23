@@ -26,5 +26,9 @@ jobs:
       run: npm ci
     - name: Collect Azure Pipelines stats
       run: node azure.js
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     - name: Collect Taskcluster stats
       run: node taskcluster.js
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

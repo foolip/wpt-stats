@@ -1,7 +1,7 @@
 'use strict';
 
 const octokit = require('@octokit/rest')({
-  auth: `token ${process.env.GH_TOKEN}`,
+  auth: `token ${process.env.GITHUB_TOKEN}`,
 });
 
 // https://github.com/octokit/rest.js/#pagination

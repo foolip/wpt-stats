@@ -2,17 +2,17 @@
 
 const octokit = require('@octokit/rest')();
 
-const GH_TOKEN = process.env.GH_TOKEN;
+const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
 
-if (!GH_TOKEN) {
-  console.error('Please set the GH_TOKEN environment variable.');
+if (!GITHUB_TOKEN) {
+  console.error('Please set the GITHUB_TOKEN environment variable.');
   console.error('https://github.com/settings/tokens');
   process.exit(1);
 }
 
 octokit.authenticate({
   type: 'token',
-  token: GH_TOKEN
+  token: GITHUB_TOKEN
 });
 
 // Time of https://github.com/web-platform-tests/wpt/issues/13818#issuecomment-436330922
