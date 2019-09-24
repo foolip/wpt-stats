@@ -63,7 +63,7 @@ async function main() {
         }
 
         const manifest = release.assets.find(asset => {
-            return /^MANIFEST-[0-9a-f]{40}.json.gz$/.test(asset.name);
+            return /^MANIFEST(-[0-9a-f]{40}).json.gz$/.test(asset.name);
         });
 
         if (!manifest) {
