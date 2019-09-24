@@ -1,3 +1,5 @@
+const pulls = require('./lib/pulls.js')
+
 const Octokit = require('@octokit/rest');
 
 const octokit = new Octokit({
@@ -9,36 +11,13 @@ const repoOptions = { owner: 'web-platform-tests', repo: 'wpt' };
 // merge_pr_* tags should exist since July 2017.
 const SINCE = Date.parse('2017-07-01T00:00Z');
 
-// gets all PRs with pagination
-async function* getAllPullRequests(prOptions) {
-    const options = octokit.pulls.list.endpoint.merge({
-        ...repoOptions,
-        ...prOptions,
-        per_page: 100,
-    });
-    let page = 0;
-    for await (const response of octokit.paginate.iterator(options)) {
-        console.log(`# page ${page}`);
-        for (const pr of response.data) {
-            yield pr;
-        }
-        page++;
-    }
-}
-
 async function main() {
-    // Note: sorting by update time means the order can change, so with
-    // pagination we may miss some PRs and see some twice. But the
-    // alternative is to fetch every single PR, since old triple-digit
-    // PRs can be merged at any time and should be tagged.
-    const prs = getAllPullRequests({
-        base: 'master',
-        state: 'closed',
-        sort: 'created',
-        direction: 'asc',
-    });
+    for await (const pr of pulls.getAll()) {
+        // Skip PRs not targeting master.
+        if (pr.base.ref !== 'master') {
+            continue;
+        }
 
-    for await (const pr of prs) {
         // Skip unmerged and old PRs
         if (!pr.merged_at || Date.parse(pr.merged_at) < SINCE) {
             continue;
@@ -55,7 +34,7 @@ async function main() {
         } catch (e) {
             // no release, check if there's a tag
             try {
-                await octokit.gitdata.getReference({
+                await octokit.git.getRef({
                     ...repoOptions,
                     ref: `tags/${tag}`
                 });

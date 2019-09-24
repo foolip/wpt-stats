@@ -24,6 +24,10 @@ jobs:
         node-version: 10.x
     - name: Install dependencies
       run: npm ci
+    - name: Update data
+      run: node update-data.js
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     - name: Collect Checks stats
       run: node checks.js
       env:
