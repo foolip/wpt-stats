@@ -34,6 +34,9 @@ async function main() {
                 tag
             })).data;
         } catch (e) {
+            if (e.status !== 404) {
+                throw e;
+            }
             // no release, check if there's a tag
             try {
                 await octokit.git.getRef({
@@ -43,6 +46,9 @@ async function main() {
                 // there is a tag, just no release
                 console.log(`${tag}: no release`);
             } catch(e) {
+                if (e.status !== 404) {
+                    throw e;
+                }
                 console.log(`${tag}: no tag`);
             }
             continue;
