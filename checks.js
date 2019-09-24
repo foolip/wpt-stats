@@ -1,5 +1,8 @@
 'use strict';
 
+// Time of https://github.com/web-platform-tests/wpt/issues/13818#issuecomment-436330922
+const AZURE_PIPELINES_SINCE = '2018-11-06T17:07:56Z';
+
 const Octokit = require('@octokit/rest');
 
 const octokit = new Octokit({
@@ -128,19 +131,31 @@ async function checkPRs(since) {
     // only look at the final commit
     const commit = commits[commits.length - 1];
 
+    const checks = await getChecksForRef(commit.sha);
+    const apCheck = checks.find(check => check.name == 'Azure Pipelines');
+    if (apCheck) {
+      if (!isRecentlyPendingCheck(apCheck) && apCheck.status !== 'completed') {
+        // Likely infra problem
+        console.log(`#${pr.number}: ${apCheck.status}: ${apCheck.details_url}`);
+      }
+    } else {
+        // If created before the cutoff time and there are no checks, that's
+        // probably because the update was just a commment and no CI has run.
+        if (Date.parse(pr.created_at) >= Date.parse(AZURE_PIPELINES_SINCE)) {
+            console.log(`#${pr.number}: no Azure Pipelines check`);
+        }
+    }
+
     const statuses = await getStatusesForRef(commit.sha);
-    const status = statuses.find(s => s.context === 'Taskcluster (pull_request)');
-    if (!status) {
-      console.log(`No Taskcluster status for ${pr.html_url}`);
-      continue;
-    }
-
-    if (isRecentlyPendingStatus(status)) {
-      continue;
-    }
-
-    if (status.state !== 'success' && status.state !== 'failure') {
-      console.log(`${status.state}: ${status.target_url} (for ${pr.html_url})`);
+    const tcStatus = statuses.find(s => s.context === 'Taskcluster (pull_request)');
+    if (tcStatus) {
+      if (!isRecentlyPendingStatus(tcStatus) &&
+          tcStatus.state !== 'success' && tcStatus.state !== 'failure') {
+        // Likely infra problem
+        console.log(`#${pr.number}: ${tcStatus.state}: ${tcStatus.target_url}`);
+      }
+    } else {
+      console.log(`#${pr.number}: no Taskcluster status`);
     }
   }
 }
