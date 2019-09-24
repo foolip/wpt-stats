@@ -28,7 +28,8 @@ async function main() {
 
         prs.push(pr);
     }
-    prs.reverse();
+    // Sort by merge date, most recent first.
+    prs.sort((a, b) => Date.parse(b.merged_at) - Date.parse(a.merged_at));
 
     console.log(`Found ${prs.length} PRs merged since ${TAGS_SINCE}`);
 
