@@ -1,4 +1,6 @@
-const pulls = require('./lib/pulls.js')
+'use strict';
+
+const pulls = require('./lib/pulls.js');
 
 const Octokit = require('@octokit/rest');
 

@@ -1,3 +1,5 @@
+'use strict';
+
 const pulls = require('./lib/pulls.js');
 
 pulls.updateAll().catch((reason) => {
