@@ -11,19 +11,15 @@ const SINCE = Date.parse('2017-07-01T00:00Z');
 
 // gets all PRs with pagination
 async function* getAllPullRequests(prOptions) {
+    const options = octokit.pulls.list.endpoint.merge({
+        ...repoOptions,
+        ...prOptions,
+        per_page: 100,
+    });
     let page = 0;
-    while (true) {
-        const prs = (await octokit.pulls.list({
-            ...repoOptions,
-            ...prOptions,
-            per_page: 100,
-            page,
-        })).data;
-        if (prs.length === 0) {
-            break;
-        }
+    for await (const response of octokit.paginate.iterator(options)) {
         console.log(`# page ${page}`);
-        for (const pr of prs) {
+        for (const pr of response.data) {
             yield pr;
         }
         page++;
