@@ -11,9 +11,10 @@ const octokit = new Octokit({
 const repoOptions = { owner: 'web-platform-tests', repo: 'wpt' };
 
 // merge_pr_* tags should exist since July 2017.
-const SINCE = Date.parse('2017-07-01T00:00Z');
+const TAGS_SINCE = ('2017-07-01T00:00Z');
 
 async function main() {
+    let prs = [];
     for await (const pr of pulls.getAll()) {
         // Skip PRs not targeting master.
         if (pr.base.ref !== 'master') {
@@ -21,10 +22,17 @@ async function main() {
         }
 
         // Skip unmerged and old PRs
-        if (!pr.merged_at || Date.parse(pr.merged_at) < SINCE) {
+        if (!pr.merged_at || Date.parse(pr.merged_at) < Date.parse(TAGS_SINCE)) {
             continue;
         }
 
+        prs.push(pr);
+    }
+    prs.reverse();
+
+    console.log(`Found ${prs.length} PRs merged since ${TAGS_SINCE}`);
+
+    for await (const pr of prs) {
         const tag = `merge_pr_${pr.number}`;
 
         let release;
