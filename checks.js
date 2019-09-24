@@ -1,5 +1,7 @@
 'use strict';
 
+const pulls = require('./lib/pulls.js');
+
 // Time of https://github.com/web-platform-tests/wpt/issues/13818#issuecomment-436330922
 const AZURE_PIPELINES_SINCE = '2018-11-06T17:07:56Z';
 
@@ -108,28 +110,17 @@ async function checkMaster(since) {
 }
 
 async function checkPRs(since) {
-  const prs = await paginate(octokit.search.issuesAndPullRequests, {
-    q: `repo:web-platform-tests/wpt is:pr is:open updated:>${since}`,
-    per_page: 100,
-  });
+  const prs = [];
+  for await (const pr of pulls.getAll()) {
+    if (pr.state === 'open' && Date.parse(pr.updated_at) > Date.parse(since)) {
+      prs.push(pr);
+    }
+  }
 
-  console.log(`Found ${prs.length} PRs since ${since}`);
+  console.log(`Found ${prs.length} PRs updated since ${since}`);
 
   for (const pr of prs) {
-    const commits = await paginate(octokit.pulls.listCommits, {
-      owner: 'web-platform-tests',
-      repo: 'wpt',
-      pull_number: pr.number,
-      per_page: 100,
-    });
-
-    if (commits.length >= 100) {
-      console.warn(`Ignoring PR #${pr.number} because it has too many (>=100) commits`);
-      continue;
-    }
-
-    // only look at the final commit
-    const commit = commits[commits.length - 1];
+    const commit = pr.head;
 
     const checks = await getChecksForRef(commit.sha);
     const apCheck = checks.find(check => check.name == 'Azure Pipelines');
