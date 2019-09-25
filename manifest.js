@@ -1,20 +1,12 @@
 'use strict';
 
-const pulls = require('./lib/pulls.js');
-
-const Octokit = require('@octokit/rest');
-
-const octokit = new Octokit({
-    auth: process.env.GITHUB_TOKEN,
-});
-
-const repoOptions = { owner: 'web-platform-tests', repo: 'wpt' };
+const {pulls, releases} = require('./lib/data.js');
 
 // merge_pr_* tags should exist since July 2017.
 const TAGS_SINCE = ('2017-07-01T00:00Z');
 
 async function main() {
-    let prs = [];
+    const prs = [];
     for await (const pr of pulls.getAll()) {
         // Skip PRs not targeting master.
         if (pr.base.ref !== 'master') {
@@ -33,51 +25,56 @@ async function main() {
 
     console.log(`Found ${prs.length} PRs merged since ${TAGS_SINCE}`);
 
+    const releaseMap = new Map();
+    for await (const release of releases.getAll()) {
+        const tag = release.tag_name;
+        if (!release.tag_name.startsWith('merge_pr_')) {
+            console.warn(`${release.html_url} tag name is unexpected`);
+            continue;
+        }
+        if (releaseMap.has(tag)) {
+            console.warn(`${tag} has multiple releases`);
+            continue;
+        }
+        releaseMap.set(tag, release);
+    }
+
+    console.log(`Found ${releaseMap.size} releases`);
+
     for await (const pr of prs) {
         const tag = `merge_pr_${pr.number}`;
 
-        let release;
-        try {
-            release = (await octokit.repos.getReleaseByTag({
-                ...repoOptions,
-                tag
-            })).data;
-        } catch (e) {
-            if (e.status !== 404) {
-                throw e;
+        const release = releaseMap.get(tag);
+        if (!release) {
+            // There could still be a tag but make no effort to distinguish that.
+            console.warn(`${pr.html_url} has no release`);
+            continue;
+        }
+
+        const formats = new Set();
+        const pattern = /^MANIFEST(-[0-9a-f]{40})?.json.(.*)$/;
+        for (const asset of release.assets) {
+            if (asset.state !== 'uploaded') {
+                console.warn(`${release.html_url} has assets in bad state`);
+                continue;
             }
-            // no release, check if there's a tag
-            try {
-                await octokit.git.getRef({
-                    ...repoOptions,
-                    ref: `tags/${tag}`
-                });
-                // there is a tag, just no release
-                console.log(`${tag}: no release`);
-            } catch(e) {
-                if (e.status !== 404) {
-                    throw e;
+            const match = asset.name.match(pattern);
+            if (match) {
+                const ext = match[2];
+                if (formats.has(ext)) {
+                    console.warn(`${release.html_url} has multiple MANIFEST.json.${ext}`);
+                    continue;
                 }
-                console.log(`${tag}: no tag`);
+                if (asset.size < 1900000) {
+                    console.warn(`${release.html_url}: MANIFEST.json.${ext} smaller than expected (${asset.size})`);
+                }
+                formats.add(ext);
             }
+        }
+        if (!formats.has('gz')) {
+            console.warn(`${release.html_url} has no MANIFEST.json.gz`);
             continue;
         }
-
-        const manifest = release.assets.find(asset => {
-            return /^MANIFEST(-[0-9a-f]{40}).json.gz$/.test(asset.name);
-        });
-
-        if (!manifest) {
-            console.log(`${tag}: no manifest`);
-            continue;
-        }
-
-        // The (compressed) manifest should be >2MB.
-        if (manifest.size < 2000000) {
-            console.log(`${tag}: manifest too small (${manifest.size})`);
-        }
-
-        console.log(`${tag}: OK`);
     }
 }
 

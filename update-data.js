@@ -1,8 +1,8 @@
 'use strict';
 
-const pulls = require('./lib/pulls.js');
+const data = require('./lib/data.js');
 
-pulls.updateAll().catch((reason) => {
+data.updateAll().catch((reason) => {
     console.error(reason);
     process.exit(1);
 });

@@ -28,5 +28,3 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     - name: Collect manifest stats
       run: node manifest.js
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
