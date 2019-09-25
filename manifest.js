@@ -65,7 +65,7 @@ async function main() {
                     console.warn(`${release.html_url} has multiple MANIFEST.json.${ext}`);
                     continue;
                 }
-                if (asset.size < 1800000) {
+                if (asset.size < 1700000) {
                     console.warn(`${release.html_url}: MANIFEST.json.${ext} smaller than expected (${asset.size})`);
                 }
                 formats.add(ext);
