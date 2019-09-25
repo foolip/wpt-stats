@@ -12,12 +12,6 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@master
-    - name: Checkout wpt
-      uses: actions/checkout@master
-      with:
-        repository: web-platform-tests/wpt
-        ref: master
-        path: wpt
     - name: Setup node
       uses: actions/setup-node@master
       with:
