@@ -5,9 +5,23 @@ const {pulls, releases} = require('./lib/data.js');
 // merge_pr_* tags should exist since July 2017.
 const TAGS_SINCE = ('2017-07-01T00:00Z');
 
+// pull requests in an unusual state which we should ignore
+const IGNORE_PULLS = new Set([
+    10543, // https://github.com/web-platform-tests/wpt/issues/10572#issuecomment-383751931
+    11452, // https://github.com/web-platform-tests/wpt/issues/10572#issuecomment-428366544
+    14238, // Subset of https://github.com/web-platform-tests/wpt/pull/14264
+    15503, // "Test dummy commit (was not actually merged)"
+    17616, // https://github.com/web-platform-tests/wpt/pull/17616#issuecomment-535428900
+]);
+
 async function main() {
     const prs = [];
     for await (const pr of pulls.getAll()) {
+        // Ignore some PRs manually.
+        if (IGNORE_PULLS.has(pr.number)) {
+            continue;
+        }
+
         // Skip PRs not targeting master.
         if (pr.base.ref !== 'master') {
             continue;
