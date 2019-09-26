@@ -28,8 +28,3 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     - name: Collect manifest stats
       run: node manifest.js
-    - name: Upload data as artifact
-      uses: actions/upload-artifact@master
-      with:
-        name: data
-        path: data
