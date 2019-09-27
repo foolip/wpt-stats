@@ -1,6 +1,6 @@
 'use strict';
 
-const {pulls, releases} = require('./lib/data.js');
+const {pulls, tags, releases} = require('./lib/data.js');
 
 // merge_pr_* tags should exist since July 2017.
 const TAGS_SINCE = ('2017-07-01T00:00Z');
@@ -36,8 +36,14 @@ async function main() {
     }
     // Sort by merge date, most recent first.
     prs.sort((a, b) => Date.parse(b.merged_at) - Date.parse(a.merged_at));
+    console.log(`Found ${prs.length} PRs`);
 
-    console.log(`Found ${prs.length} PRs merged since ${TAGS_SINCE}`);
+    // Map from tag name to commit.
+    const commitMap = new Map();
+    for await (const tag of tags.getAll()) {
+        commitMap.set(tag.name, tag.commit.sha);
+    }
+    console.log(`Found ${commitMap.size} tags`);
 
     const releaseMap = new Map();
     for await (const release of releases.getAll()) {
@@ -52,21 +58,25 @@ async function main() {
         }
         releaseMap.set(tag, release);
     }
-
     console.log(`Found ${releaseMap.size} releases`);
 
-    for await (const pr of prs) {
+    for (const pr of prs) {
         const tag = `merge_pr_${pr.number}`;
+
+        const commit = commitMap.get(tag);
+        if (!commit) {
+            console.warn(`${pr.html_url} has no tag (${tag})`);
+            continue;
+        }
 
         const release = releaseMap.get(tag);
         if (!release) {
-            // There could still be a tag but make no effort to distinguish that.
             console.warn(`${pr.html_url} has no release`);
             continue;
         }
 
         const formats = new Set();
-        const pattern = /^MANIFEST(-[0-9a-f]{40})?.json.(.*)$/;
+        const pattern = /^MANIFEST-([0-9a-f]{40}).json.(.*)$/;
         for (const asset of release.assets) {
             if (asset.state !== 'uploaded') {
                 console.warn(`${release.html_url} has assets in bad state`);
@@ -74,10 +84,13 @@ async function main() {
             }
             const match = asset.name.match(pattern);
             if (match) {
+                const assetCommit = match[1];
+                if (assetCommit !== commit) {
+                    console.warn(`${release.html_url} has asset ${asset.name} for wrong commit`);
+                }
                 const ext = match[2];
                 if (formats.has(ext)) {
                     console.warn(`${release.html_url} has multiple MANIFEST.json.${ext}`);
-                    continue;
                 }
                 if (asset.size < 1600000) {
                     console.warn(`${release.html_url}: MANIFEST.json.${ext} smaller than expected (${asset.size})`);
