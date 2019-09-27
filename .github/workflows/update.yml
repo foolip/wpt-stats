@@ -22,9 +22,9 @@ jobs:
       run: node update-data.js
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    - name: Collect Checks stats
+    - name: Verify manifest releases
+      run: node manifest.js
+    - name: Monitor checks
       run: node checks.js
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    - name: Collect manifest stats
-      run: node manifest.js
