@@ -37,7 +37,7 @@ async function getStatusesForRef(ref) {
   // Statuses are in reverse chronological order, so filter out all but the
   // first for each unique context string.
   const seenContexts = new Set;
-  return statuses.filter(status => {
+  return statuses.filter((status) => {
     const context = status.context;
     if (seenContexts.has(context)) {
       return false;
@@ -69,12 +69,13 @@ function isRecentlyPendingStatus(status, maxAge = 2*3600) {
   return false;
 }
 
+// eslint-disable-next-line no-unused-vars
 async function checkMaster(since) {
   const commits = await paginate(octokit.repos.listCommits, {
     owner: 'web-platform-tests',
     repo: 'wpt',
     since,
-    per_page: 100
+    per_page: 100,
   });
 
   console.log(`Found ${commits.length} commits since ${since}`);
@@ -94,7 +95,7 @@ async function checkMaster(since) {
     }
 
     const statuses = await getStatusesForRef(commit.sha);
-    const status = statuses.find(s => s.context === 'Taskcluster (push)');
+    const status = statuses.find((s) => s.context === 'Taskcluster (push)');
     if (!status) {
       continue;
     }
@@ -123,22 +124,22 @@ async function checkPRs(since) {
     const commit = pr.head;
 
     const checks = await getChecksForRef(commit.sha);
-    const apCheck = checks.find(check => check.name == 'Azure Pipelines');
+    const apCheck = checks.find((check) => check.name == 'Azure Pipelines');
     if (apCheck) {
       if (!isRecentlyPendingCheck(apCheck) && apCheck.status !== 'completed') {
         // Likely infra problem
         console.log(`#${pr.number}: ${apCheck.status}: ${apCheck.details_url}`);
       }
     } else {
-        // If created before the cutoff time and there are no checks, that's
-        // probably because the update was just a commment and no CI has run.
-        if (Date.parse(pr.created_at) >= Date.parse(AZURE_PIPELINES_SINCE)) {
-            console.log(`#${pr.number}: no Azure Pipelines check`);
-        }
+      // If created before the cutoff time and there are no checks, that's
+      // probably because the update was just a commment and no CI has run.
+      if (Date.parse(pr.created_at) >= Date.parse(AZURE_PIPELINES_SINCE)) {
+        console.log(`#${pr.number}: no Azure Pipelines check`);
+      }
     }
 
     const statuses = await getStatusesForRef(commit.sha);
-    const tcStatus = statuses.find(s => s.context === 'Taskcluster (pull_request)');
+    const tcStatus = statuses.find((s) => s.context === 'Taskcluster (pull_request)');
     if (tcStatus) {
       if (!isRecentlyPendingStatus(tcStatus) &&
           tcStatus.state !== 'success' && tcStatus.state !== 'failure') {
@@ -157,7 +158,7 @@ async function main() {
   // Get rid of milliseconds, GitHub doesn't support it.
   const since = weekAgo.replace(/\.[0-9]+Z/, 'Z');
 
-  //await checkMaster(since);
+  // await checkMaster(since);
   await checkPRs(since);
 }
 

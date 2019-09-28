@@ -3,6 +3,6 @@
 const data = require('./lib/data.js');
 
 data.updateAll().catch((reason) => {
-    console.error(reason);
-    process.exit(1);
+  console.error(reason);
+  process.exit(1);
 });
