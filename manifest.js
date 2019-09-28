@@ -38,10 +38,12 @@ async function main() {
   prs.sort((a, b) => Date.parse(b.merged_at) - Date.parse(a.merged_at));
   console.log(`Found ${prs.length} PRs`);
 
-  // Map from tag name to commit.
+  // Map from merge_pr_* tag name to commit.
   const commitMap = new Map();
   for await (const tag of tags.getAll()) {
-    commitMap.set(tag.name, tag.commit.sha);
+    if (tag.name.startsWith('merge_pr_')) {
+      commitMap.set(tag.name, tag.commit.sha);
+    }
   }
   console.log(`Found ${commitMap.size} tags`);
 
