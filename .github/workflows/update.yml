@@ -1,7 +1,7 @@
 on:
   schedule:
-    # 6:40 UTC daily
-    - cron: '40 6 * * *'
+    # 4:44 UTC daily
+    - cron: '44 4 * * *'
   push:
     branches:
     - master
