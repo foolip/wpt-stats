@@ -2,7 +2,8 @@
 
 const {pulls, tags, releases} = require('./lib/data.js');
 
-// merge_pr_* tags should exist since July 2017.
+// merge_pr_* tags should exist since July 2017. (The setup was added in
+// November 2017 (#8005) but tags and releases have been backfilled.)
 const TAGS_SINCE = ('2017-07-01T00:00Z');
 
 // pull requests in an unusual state which we should ignore
