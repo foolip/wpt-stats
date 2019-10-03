@@ -128,13 +128,13 @@ async function checkPRs(since) {
     if (apCheck) {
       if (!isRecentlyPendingCheck(apCheck) && apCheck.status !== 'completed') {
         // Likely infra problem
-        console.log(`#${pr.number}: ${apCheck.status}: ${apCheck.details_url}`);
+        console.log(`${pr.html_url} check ${apCheck.details_url} status is ${apCheck.status}`);
       }
     } else {
       // If created before the cutoff time and there are no checks, that's
       // probably because the update was just a commment and no CI has run.
       if (Date.parse(pr.created_at) >= Date.parse(AZURE_PIPELINES_SINCE)) {
-        console.log(`#${pr.number}: no Azure Pipelines check`);
+        console.log(`${pr.html_url} has no Azure Pipelines check`);
       }
     }
 
@@ -144,10 +144,10 @@ async function checkPRs(since) {
       if (!isRecentlyPendingStatus(tcStatus) &&
           tcStatus.state !== 'success' && tcStatus.state !== 'failure') {
         // Likely infra problem
-        console.log(`#${pr.number}: ${tcStatus.state}: ${tcStatus.target_url}`);
+        console.log(`${pr.html_url} status ${tcStatus.target_url} state is ${tcStatus.state}: `);
       }
     } else {
-      console.log(`#${pr.number}: no Taskcluster status`);
+      console.log(`${pr.html_url} has no Taskcluster status`);
     }
   }
 }
