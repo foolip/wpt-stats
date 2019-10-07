@@ -113,9 +113,16 @@ async function checkMaster(since) {
 async function checkPRs(since) {
   const prs = [];
   for await (const pr of pulls.getAll()) {
-    if (pr.state === 'open' && Date.parse(pr.updated_at) > Date.parse(since)) {
-      prs.push(pr);
+    if (pr.state !== 'open') {
+      continue;
     }
+    if (pr.labels.some((label) => label.name === 'do not merge yet')) {
+      continue;
+    }
+    if (Date.parse(pr.updated_at) < Date.parse(since)) {
+      continue;
+    }
+    prs.push(pr);
   }
 
   console.log(`Found ${prs.length} PRs updated since ${since}`);
