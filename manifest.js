@@ -56,7 +56,8 @@ async function main() {
       continue;
     }
     if (releaseMap.has(tag)) {
-      console.warn(`${tag} has multiple releases`);
+      const otherRelease = releaseMap.get(tag);
+      console.warn(`${tag} has multiple releases: ${otherRelease.id} and ${release.id}`);
       continue;
     }
     releaseMap.set(tag, release);
@@ -82,14 +83,14 @@ async function main() {
     const pattern = /^MANIFEST-([0-9a-f]{40}).json.(.*)$/;
     for (const asset of release.assets) {
       if (asset.state !== 'uploaded') {
-        console.warn(`${release.html_url} has assets in bad state`);
+        console.warn(`${release.html_url} has assets in bad state: ${asset.state}`);
         continue;
       }
       const match = asset.name.match(pattern);
       if (match) {
         const assetCommit = match[1];
         if (assetCommit !== commit) {
-          console.warn(`${release.html_url} has asset ${asset.name} for wrong commit`);
+          console.warn(`${release.html_url} has asset ${asset.name} for wrong commit: ${assetCommit}`);
         }
         const ext = match[2];
         if (formats.has(ext)) {
