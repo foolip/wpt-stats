@@ -12,7 +12,7 @@
   },
   "dependencies": {
     "@octokit/rest": "16.35.2",
-    "fs-extra": "8.1.0"
+    "fs-extra": "9.0.0"
   },
   "devDependencies": {
     "eslint": "6.7.2",
