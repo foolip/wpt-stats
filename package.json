@@ -11,7 +11,7 @@
     "lint": "eslint ."
   },
   "dependencies": {
-    "@octokit/rest": "16.35.2",
+    "@octokit/rest": "17.6.0",
     "fs-extra": "8.1.0"
   },
   "devDependencies": {
