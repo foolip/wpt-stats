@@ -1,4 +1,4 @@
-module.exports = {
+{
   "extends": ["eslint:recommended", "google"],
   "parserOptions": {
     "ecmaVersion": 2018
@@ -11,4 +11,4 @@ module.exports = {
     "es6": true,
     "node": true
   }
-};
+}
