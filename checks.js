@@ -95,7 +95,7 @@ async function checkMaster(since) {
     }
 
     const statuses = await getStatusesForRef(commit.sha);
-    const status = statuses.find((s) => s.context === 'Taskcluster (push)');
+    const status = statuses.find((s) => s.context === 'Community-TC (push)');
     if (!status) {
       continue;
     }
@@ -146,7 +146,7 @@ async function checkPRs(since) {
     }
 
     const statuses = await getStatusesForRef(commit.sha);
-    const tcStatus = statuses.find((s) => s.context === 'Taskcluster (pull_request)');
+    const tcStatus = statuses.find((s) => s.context === 'Community-TC (pull_request)');
     if (tcStatus) {
       if (!isRecentlyPendingStatus(tcStatus) &&
           tcStatus.state !== 'success' && tcStatus.state !== 'failure') {
