@@ -14,6 +14,7 @@ const IGNORE_PULLS = new Set([
   15503, // "Test dummy commit (was not actually merged)"
   17616, // https://github.com/web-platform-tests/wpt/pull/17616#issuecomment-535428900
   21727, // https://github.com/web-platform-tests/wpt/pull/21727#issuecomment-633961074
+  21755, // No changes
   21779, // Dupe of https://github.com/web-platform-tests/wpt/pull/21780
 ]);
 
