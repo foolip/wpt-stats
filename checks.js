@@ -5,7 +5,7 @@ const {pulls} = require('./lib/data.js');
 // Time of https://github.com/web-platform-tests/wpt/issues/13818#issuecomment-436330922
 const AZURE_PIPELINES_SINCE = '2018-11-06T17:07:56Z';
 
-const Octokit = require('@octokit/rest');
+const {Octokit} = require('@octokit/rest');
 
 const octokit = new Octokit({
   auth: process.env.GITHUB_TOKEN,
