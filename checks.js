@@ -2,9 +2,6 @@
 
 const {pulls} = require('./lib/data.js');
 
-// Time of https://github.com/web-platform-tests/wpt/issues/13818#issuecomment-436330922
-const AZURE_PIPELINES_SINCE = '2018-11-06T17:07:56Z';
-
 const {Octokit} = require('@octokit/rest');
 
 const octokit = new Octokit({
@@ -17,40 +14,10 @@ function paginate(method, parameters) {
   return octokit.paginate(options);
 }
 
-function getChecksForRef(ref) {
-  return paginate(octokit.checks.listForRef, {
-    owner: 'web-platform-tests',
-    repo: 'wpt',
-    ref,
-    per_page: 100,
-  });
-}
-
-async function getStatusesForRef(ref) {
-  const statuses = await paginate(octokit.repos.listStatusesForRef, {
-    owner: 'web-platform-tests',
-    repo: 'wpt',
-    ref,
-    per_page: 100,
-  });
-
-  // Statuses are in reverse chronological order, so filter out all but the
-  // first for each unique context string.
-  const seenContexts = new Set;
-  return statuses.filter((status) => {
-    const context = status.context;
-    if (seenContexts.has(context)) {
-      return false;
-    }
-    seenContexts.add(context);
-    return true;
-  });
-}
-
 function isRecentlyPendingCheck(check, maxAge = 6*3600) {
-  if (check.conclusion === null && check.updated_at) {
-    const updated = Date.parse(check.updated_at);
-    const age = (Date.now() - updated) / 1000;
+  if (check.conclusion === null && check.started_at) {
+    const started = Date.parse(check.started_at);
+    const age = (Date.now() - started) / 1000;
     if (age < maxAge) {
       return true;
     }
@@ -58,19 +25,29 @@ function isRecentlyPendingCheck(check, maxAge = 6*3600) {
   return false;
 }
 
-function isRecentlyPendingStatus(status, maxAge = 2*3600) {
-  if (status.state === 'pending' && status.updated_at) {
-    const updated = Date.parse(status.updated_at);
-    const age = (Date.now() - updated) / 1000;
-    if (age < maxAge) {
-      return true;
+async function checkChecksForRef(ref, context) {
+  const checks = await paginate(octokit.checks.listForRef, {
+    owner: 'web-platform-tests',
+    repo: 'wpt',
+    ref,
+    per_page: 100,
+  });
+
+  for (const check of checks) {
+    if (check.conclusion === 'success' || check.conclusion === 'neutral') {
+      continue;
     }
+
+    if (isRecentlyPendingCheck(check)) {
+      continue;
+    }
+
+    console.log(`${check.conclusion}: ${check.details_url} (for ${context})`);
   }
-  return false;
 }
 
 // eslint-disable-next-line no-unused-vars
-async function checkMaster(since) {
+async function checkCommits(since) {
   const commits = await paginate(octokit.repos.listCommits, {
     owner: 'web-platform-tests',
     repo: 'wpt',
@@ -81,32 +58,7 @@ async function checkMaster(since) {
   console.log(`Found ${commits.length} commits since ${since}`);
 
   for (const commit of commits) {
-    const checks = await getChecksForRef(commit.sha);
-    for (const check of checks) {
-      if (check.conclusion === 'success' || check.conclusion === 'neutral') {
-        continue;
-      }
-
-      if (isRecentlyPendingCheck(check)) {
-        continue;
-      }
-
-      console.log(`${check.conclusion}: ${check.details_url} (for ${commit.sha})`);
-    }
-
-    const statuses = await getStatusesForRef(commit.sha);
-    const status = statuses.find((s) => s.context === 'Community-TC (push)');
-    if (!status) {
-      continue;
-    }
-
-    if (isRecentlyPendingStatus(status)) {
-      continue;
-    }
-
-    if (status.state !== 'success') {
-      console.log(`${status.state}: ${status.target_url} (for ${commit.sha})`);
-    }
+    await checkChecksForRef(commit.sha, commit.html_url);
   }
 }
 
@@ -129,33 +81,7 @@ async function checkPRs(since) {
 
   for (const pr of prs) {
     const commit = pr.head;
-
-    const checks = await getChecksForRef(commit.sha);
-    const apCheck = checks.find((check) => check.name == 'Azure Pipelines');
-    if (apCheck) {
-      if (!isRecentlyPendingCheck(apCheck) && apCheck.status !== 'completed') {
-        // Likely infra problem
-        console.log(`${pr.html_url} check ${apCheck.details_url} status is ${apCheck.status}`);
-      }
-    } else {
-      // If created before the cutoff time and there are no checks, that's
-      // probably because the update was just a commment and no CI has run.
-      if (Date.parse(pr.created_at) >= Date.parse(AZURE_PIPELINES_SINCE)) {
-        console.log(`${pr.html_url} has no Azure Pipelines check`);
-      }
-    }
-
-    const statuses = await getStatusesForRef(commit.sha);
-    const tcStatus = statuses.find((s) => s.context === 'Community-TC (pull_request)');
-    if (tcStatus) {
-      if (!isRecentlyPendingStatus(tcStatus) &&
-          tcStatus.state !== 'success' && tcStatus.state !== 'failure') {
-        // Likely infra problem
-        console.log(`${pr.html_url} status ${tcStatus.target_url} state is ${tcStatus.state}: `);
-      }
-    } else {
-      console.log(`${pr.html_url} has no Taskcluster status`);
-    }
+    await checkChecksForRef(commit.sha, pr.html_url);
   }
 }
 
@@ -165,7 +91,7 @@ async function main() {
   // Get rid of milliseconds, GitHub doesn't support it.
   const since = weekAgo.replace(/\.[0-9]+Z/, 'Z');
 
-  // await checkMaster(since);
+  await checkCommits(since);
   await checkPRs(since);
 }
 
