@@ -4,19 +4,19 @@ on:
     - cron: '44 4 * * *'
   push:
     branches:
-    - master
+    - main
   pull_request: {}
 name: update
 jobs:
   update:
-    runs-on: ubuntu-18.04
+    runs-on: ubuntu-20.04
     steps:
     - name: Checkout
-      uses: actions/checkout@master
+      uses: actions/checkout@v2
     - name: Setup node
-      uses: actions/setup-node@master
+      uses: actions/setup-node@v2
       with:
-        node-version: 12.x
+        node-version: 14.x
     - name: Install dependencies
       run: npm ci
     - name: Update data

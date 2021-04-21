@@ -27,8 +27,8 @@ async function main() {
       continue;
     }
 
-    // Skip PRs not targeting master.
-    if (pr.base.ref !== 'master') {
+    // Skip PRs not targeting the default branch.
+    if (pr.base.ref !== 'main' && pr.base.ref !== 'master') {
       continue;
     }
 
