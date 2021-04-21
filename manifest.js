@@ -17,6 +17,8 @@ const IGNORE_PULLS = new Set([
   21755, // No changes
   21779, // Dupe of https://github.com/web-platform-tests/wpt/pull/21780
   23367, // Dupe of https://github.com/web-platform-tests/wpt/pull/23366
+  23862, // Dupe of https://github.com/web-platform-tests/wpt/pull/23863
+  25576, // No changes
 ]);
 
 async function main() {
