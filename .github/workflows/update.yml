@@ -1,11 +1,8 @@
 on:
   schedule:
-    # 4:44 UTC daily
-    - cron: '44 4 * * *'
-  push:
-    branches:
-    - main
-  pull_request: {}
+    # 04:44 UTC on Thursdays
+    - cron: '44 4 * * 4'
+  workflow_dispatch:
 name: update
 jobs:
   update:
