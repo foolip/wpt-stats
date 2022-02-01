@@ -15,7 +15,7 @@
     "fs-extra": "10.0.0"
   },
   "devDependencies": {
-    "eslint": "8.6.0",
+    "eslint": "8.8.0",
     "eslint-config-google": "0.14.0"
   }
 }
