@@ -3,9 +3,9 @@ on:
     # 04:44 UTC on Thursdays
     - cron: '44 4 * * 4'
   workflow_dispatch:
-name: update
+name: manifest
 jobs:
-  update:
+  verify:
     runs-on: ubuntu-20.04
     steps:
     - name: Checkout
@@ -22,7 +22,3 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     - name: Verify manifest releases
       run: node manifest.js
-    - name: Monitor checks
-      run: node checks.js
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
