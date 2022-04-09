@@ -1,3 +1,3 @@
-# web-platform-tests statistics
+# web-platform-tests manifest checker
 
-Collection of scripts to collect stats on web-platform-tests and check that its CI systems are working.
+Script to check if each merged PR in WPT has a release with manifests uploaded.

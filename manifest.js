@@ -1,12 +1,44 @@
-'use strict';
+import {Octokit} from '@octokit/rest';
+import {throttling} from '@octokit/plugin-throttling';
 
-const {pulls, tags, releases} = require('./lib/data.js');
+// Manifests are uploaded as artifacts for releases on GitHub, for tags named
+// merge_pr_*. These releases are created when (right after) a PR is merged, but
+// the process is fallible and tags/releases can be missing.
+//
+// In principle we need to check if tags/releases exist for all merged PRs ever,
+// which requires iterating through all PRs. (Very old PRs are still open and
+// could be merged, so this can't be limited to PRs created since some date.)
+//
+// However, the cost of doing these checks steadily increase with time, so
+// instead the approach is to check the most recently updated PRs:
+//
+// - Iterate all pull requests by update date, most recently updated first.
+// - Ignore PRs that aren't merged or not merged into master/main.
+// - Ignore PRs that were merged before merge_pr_* tags were used.
+// - Ignore PRs that are known to be missing the tag for a good reason.
+// - Stop iterating when the update date is older than a cutoff date.
+//
+// For all PRs found, check if there's a release with manifests uploaded.
+//
+// Since PRs might be updated while we're iterating them, it's probably possible
+// for the GitHub API to miss some PRs entirely. The only protection against
+// this is to run this script often, making it unlikely that the same PR will be
+// missed every single time.
 
 // merge_pr_* tags should exist since July 2017. (The setup was added in
 // November 2017 (#8005) but tags and releases have been backfilled.)
-const TAGS_SINCE = ('2017-07-01T00:00Z');
+const TAGS_SINCE = Date.parse('2017-07-01T00:00Z');
 
-// pull requests in an unusual state which we should ignore
+// This cutoff date is to avoid indefinite growth in time taken, and can be
+// bumped when it is known that all PRs before it pass. Note that any PR merged
+// before this could still be updated (by a comment) and be checked anyway.
+const CHECK_SINCE = Date.parse('2021-01-01T00:00Z');
+
+// Avoid checking PRs that were recently merged, as tags/releases are created in
+// a CI job that takes time. Allow for 1 hour.
+const CHECK_UNTIL = Date.now() - 3600_000;
+
+// PRs in an unusual state which we should ignore:
 const IGNORE_PULLS = new Set([
   10543, // https://github.com/web-platform-tests/wpt/issues/10572#issuecomment-383751931
   11452, // https://github.com/web-platform-tests/wpt/issues/10572#issuecomment-428366544
@@ -20,103 +52,172 @@ const IGNORE_PULLS = new Set([
   23862, // Dupe of https://github.com/web-platform-tests/wpt/pull/23863
   25576, // No changes
   29117, // No changes
+  29233, // Dupe of https://github.com/web-platform-tests/wpt/pull/29221
+  31577, // Dupe of https://github.com/web-platform-tests/wpt/pull/31575
+  31797, // No changes
+  33431, // No changes
 ]);
 
-async function main() {
-  const prs = [];
-  for await (const pr of pulls.getAll()) {
-    // Ignore some PRs manually.
-    if (IGNORE_PULLS.has(pr.number)) {
-      continue;
-    }
-
-    // Skip PRs not targeting the default branch.
-    if (pr.base.ref !== 'main' && pr.base.ref !== 'master') {
-      continue;
-    }
-
-    // Skip unmerged and old PRs
-    if (!pr.merged_at || Date.parse(pr.merged_at) < Date.parse(TAGS_SINCE)) {
-      continue;
-    }
-
-    prs.push(pr);
-  }
-  // Sort by merge date, most recent first.
-  prs.sort((a, b) => Date.parse(b.merged_at) - Date.parse(a.merged_at));
-  console.log(`Found ${prs.length} PRs`);
-
-  // Map from merge_pr_* tag name to commit.
-  const commitMap = new Map();
-  for await (const tag of tags.getAll()) {
-    if (tag.name.startsWith('merge_pr_')) {
-      commitMap.set(tag.name, tag.commit.sha);
-    }
-  }
-  console.log(`Found ${commitMap.size} tags`);
-
-  const releaseMap = new Map();
-  for await (const release of releases.getAll()) {
-    const tag = release.tag_name;
-    if (!release.tag_name.startsWith('merge_pr_')) {
-      console.warn(`${release.html_url} tag name is unexpected`);
-      continue;
-    }
-    if (releaseMap.has(tag)) {
-      const otherRelease = releaseMap.get(tag);
-      console.warn(`${tag} has multiple releases: ${otherRelease.id} and ${release.id}`);
-      continue;
-    }
-    releaseMap.set(tag, release);
-  }
-  console.log(`Found ${releaseMap.size} releases`);
-
-  for (const pr of prs) {
-    const tag = `merge_pr_${pr.number}`;
-
-    const commit = commitMap.get(tag);
-    if (!commit) {
-      console.warn(`${pr.html_url} has no tag (${tag})`);
-      continue;
-    }
-
-    const release = releaseMap.get(tag);
-    if (!release) {
-      console.warn(`${pr.html_url} has no release`);
-      continue;
-    }
-
-    const formats = new Set();
-    const pattern = /^MANIFEST-([0-9a-f]{40}).json.(.*)$/;
-    for (const asset of release.assets) {
-      if (asset.state !== 'uploaded') {
-        console.warn(`${release.html_url} has assets in bad state: ${asset.state}`);
-        continue;
-      }
-      const match = asset.name.match(pattern);
-      if (match) {
-        const assetCommit = match[1];
-        if (assetCommit !== commit) {
-          console.warn(`${release.html_url} has asset ${asset.name} for wrong commit: ${assetCommit}`);
-        }
-        const ext = match[2];
-        if (formats.has(ext)) {
-          console.warn(`${release.html_url} has multiple MANIFEST.json.${ext}`);
-        }
-        if (asset.size < 1600000) {
-          console.warn(`${release.html_url}: MANIFEST.json.${ext} smaller than expected (${asset.size})`);
-        }
-        formats.add(ext);
-      }
-    }
-    if (!formats.has('gz')) {
-      console.warn(`${release.html_url} has no MANIFEST.json.gz`);
-      continue;
+async function* iteratePulls(octokit) {
+  for await (const response of octokit.paginate.iterator(
+      octokit.rest.pulls.list,
+      {
+        owner: 'web-platform-tests',
+        repo: 'wpt',
+        state: 'all',
+        sort: 'updated',
+        direction: 'desc',
+        per_page: 100,
+      },
+  )) {
+    for (const pr of response.data) {
+      yield pr;
     }
   }
 }
 
-main().catch((reason) => {
-  console.error(reason);
-  process.exit(1);
-});
+async function getRelease(octokit, tag) {
+  let response;
+  try {
+    response = await octokit.rest.repos.getReleaseByTag({
+      owner: 'web-platform-tests',
+      repo: 'wpt',
+      tag,
+    });
+  } catch (error) {
+    if (error.status === 404) {
+      return undefined;
+    }
+    throw error;
+  }
+  return response.data;
+}
+
+function shouldSkipPull(pr) {
+  // Ignore some PRs manually.
+  if (IGNORE_PULLS.has(pr.number)) {
+    return true;
+  }
+
+  // Skip PRs not targeting the default branch.
+  if (pr.base.ref !== 'main' && pr.base.ref !== 'master') {
+    return true;
+  }
+
+  // Skip unmerged PRs
+  if (!pr.merged_at) {
+    return true;
+  }
+
+  // Skip PRs merged before there were merge_pr_* tags/releases.
+  if (Date.parse(pr.merged_at) < TAGS_SINCE) {
+    return true;
+  }
+
+  return false;
+}
+
+function checkRelease(release) {
+  const formats = new Set();
+  const pattern = /^MANIFEST-([0-9a-f]{40}).json.(.*)$/;
+  for (const asset of release.assets) {
+    if (asset.state !== 'uploaded') {
+      throw new Error(`asset in unexpected state (${asset.state})`);
+    }
+    const match = asset.name.match(pattern);
+    if (match) {
+      const ext = match[2];
+      if (formats.has(ext)) {
+        throw new Error(`multiple .${ext} manifests found`);
+      }
+      if (asset.size < 1600000) {
+        throw new Error(`${asset.name} smaller than expected (${asset.size} < 1600000)`);
+      }
+      formats.add(ext);
+    }
+  }
+  if (!formats.has('gz')) {
+    throw new Error('no .gz manifest found');
+  }
+}
+
+async function main() {
+  const ThrottlingOctokit = Octokit.plugin(throttling);
+
+  const octokit = new ThrottlingOctokit({
+    auth: process.env.GITHUB_TOKEN,
+    throttle: {
+      onRateLimit: (retryAfter, options) => {
+        console.log('');
+        if (options.request.retryCount <= 2) {
+          console.warn(`Rate limiting triggered, retrying after ${retryAfter} seconds!`);
+          return true;
+        } else {
+          console.error(`Rate limiting triggered, not retrying again!`);
+        }
+      },
+      onAbuseLimit: () => {
+        console.error('Abuse limit triggered, not retrying!');
+      },
+    },
+  });
+
+  let checkedReleases = 0;
+  const errors = [];
+
+  for await (const pr of iteratePulls(octokit)) {
+    const updatedAt = Date.parse(pr.updated_at);
+    if (isNaN(updatedAt)) {
+      throw new Error(`${pr.html_url} has no update date`);
+    }
+
+    // Silently skip recently updated PRs.
+    if (updatedAt >= CHECK_UNTIL) {
+      continue;
+    }
+
+    // Stop when the cutoff date has been reached.
+    if (updatedAt < CHECK_SINCE) {
+      break;
+    }
+
+    if (shouldSkipPull(pr)) {
+      continue;
+    }
+
+    const release = await getRelease(octokit, `merge_pr_${pr.number}`);
+
+    if (!release) {
+      const message = `${pr.html_url}: release not found`;
+      console.error(message);
+      errors.push(message);
+      continue;
+    }
+
+    try {
+      checkRelease(release);
+      console.info(`${release.html_url} OK`);
+    } catch (error) {
+      const message = `${release.html_url}: ${error.message}`;
+      console.error(message);
+      errors.push(message);
+    }
+
+    checkedReleases++;
+  }
+
+  console.info();
+  const fmt = (v) => new Date(v).toISOString();
+  console.info(`Checked ${checkedReleases} PRs updated between ${fmt(CHECK_SINCE)} and ${fmt(CHECK_UNTIL)}.`);
+  if (errors.length) {
+    console.info(`There were ${errors.length} error(s):`);
+    for (const message of errors) {
+      console.error(message);
+    }
+    process.exit(1);
+  } else {
+    console.info('There were no errors.');
+  }
+}
+
+await main();
