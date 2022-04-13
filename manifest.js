@@ -18,7 +18,10 @@ import {throttling} from '@octokit/plugin-throttling';
 // - Ignore PRs that are known to be missing the tag for a good reason.
 // - Stop iterating when the update date is older than a cutoff date.
 //
-// For all PRs found, check if there's a release with manifests uploaded.
+// For all PRs found, check if there's a release with manifests uploaded. To
+// avoid 1 request per PR, first cache all releases created before the cutoff
+// date, 100 per request. Most of the releases we need to verify will be in the
+// cache.
 //
 // Since PRs might be updated while we're iterating them, it's probably possible
 // for the GitHub API to miss some PRs entirely. The only protection against
@@ -76,7 +79,44 @@ async function* iteratePulls(octokit) {
   }
 }
 
-async function getRelease(octokit, tag) {
+async function getReleaseCache(octokit) {
+  const cache = new Map();
+  let stop = false;
+
+  // This API does not allow for sorting. But the order seems to be release
+  // creation date, newest first, which is exactly what we need.
+  for await (const response of octokit.paginate.iterator(
+      octokit.rest.repos.listReleases,
+      {
+        owner: 'web-platform-tests',
+        repo: 'wpt',
+        per_page: 100,
+      },
+  )) {
+    for (const release of response.data) {
+      if (release.draft) {
+        continue;
+      }
+      cache.set(release.tag_name, release);
+      if (Date.parse(release.created_at) < CHECK_SINCE) {
+        // Stop making requests but cache all the releases we just fetched.
+        stop = true;
+      }
+    }
+    if (stop) {
+      break;
+    }
+  }
+
+  return cache;
+}
+
+async function getRelease(octokit, cache, tag) {
+  const cached = cache.get(tag);
+  if (cached) {
+    return cached;
+  }
+
   let response;
   try {
     response = await octokit.rest.repos.getReleaseByTag({
@@ -162,6 +202,8 @@ async function main() {
     },
   });
 
+  const cache = await getReleaseCache(octokit);
+
   let checkedReleases = 0;
   const errors = [];
 
@@ -185,7 +227,7 @@ async function main() {
       continue;
     }
 
-    const release = await getRelease(octokit, `merge_pr_${pr.number}`);
+    const release = await getRelease(octokit, cache, `merge_pr_${pr.number}`);
 
     if (!release) {
       const message = `${pr.html_url}: release not found`;
