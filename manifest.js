@@ -35,7 +35,7 @@ const TAGS_SINCE = Date.parse('2017-07-01T00:00Z');
 // This cutoff date is to avoid indefinite growth in time taken, and can be
 // bumped when it is known that all PRs before it pass. Note that any PR merged
 // before this could still be updated (by a comment) and be checked anyway.
-const CHECK_SINCE = Date.parse('2021-01-01T00:00Z');
+const CHECK_SINCE = Date.parse('2022-04-13T00:00Z');
 
 // Avoid checking PRs that were recently merged, as tags/releases are created in
 // a CI job that takes time. Allow for 1 hour.
