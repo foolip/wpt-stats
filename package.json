@@ -16,7 +16,7 @@
     "@octokit/rest": "18.12.0"
   },
   "devDependencies": {
-    "eslint": "8.21.0",
+    "eslint": "8.23.0",
     "eslint-config-google": "0.14.0"
   }
 }
