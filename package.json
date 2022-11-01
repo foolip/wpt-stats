@@ -13,7 +13,7 @@
   },
   "dependencies": {
     "@octokit/plugin-throttling": "3.7.0",
-    "@octokit/rest": "19.0.4"
+    "@octokit/rest": "19.0.5"
   },
   "devDependencies": {
     "eslint": "8.24.0",
