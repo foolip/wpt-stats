@@ -62,6 +62,7 @@ const IGNORE_PULLS = new Set([
   36028, // No changes
   36039, // No changes
   37805, // No changes
+  37935, // No changes
 ]);
 
 async function* iteratePulls(octokit) {
